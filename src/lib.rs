@@ -251,7 +251,7 @@ mod ansi;
 pub use ansi::{Prefix, Infix, Suffix};
 
 mod style;
-pub use style::{Colour, Style};
+pub use style::{Colour, Style, Shell};
 
 /// Color is a type alias for `Colour`.
 pub use Colour as Color;

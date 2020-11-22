@@ -243,6 +243,15 @@ impl Default for Style {
     }
 }
 
+/// A shell is the Unix shell used to print the output, used to
+/// determine the escape characters needed when printing.
+#[derive(PartialEq, Clone, Copy, Debug)]
+#[cfg_attr(feature = "derive_serde_style", derive(serde::Deserialize, serde::Serialize))]
+pub enum Shell {
+    Bash,
+    Zsh,
+    None
+}
 
 // ---- colours ----
 

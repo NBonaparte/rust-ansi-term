@@ -7,7 +7,7 @@ pub fn sub_string<'a>(start: usize, len: usize, strs: &ANSIStrings<'a>) -> Vec<A
     let mut pos = start;
     let mut len_rem = len;
 
-    for i in strs.0.iter() {
+    for i in strs.strings.iter() {
         let fragment = i.deref();
         let frag_len = fragment.len();
         if pos >= frag_len {
@@ -38,7 +38,7 @@ pub fn sub_string<'a>(start: usize, len: usize, strs: &ANSIStrings<'a>) -> Vec<A
 pub fn unstyle(strs: &ANSIStrings) -> String {
     let mut s = String::new();
 
-    for i in strs.0.iter() {
+    for i in strs.strings.iter() {
         s += &i.deref();
     }
 
@@ -48,7 +48,7 @@ pub fn unstyle(strs: &ANSIStrings) -> String {
 /// Return the unstyled length of ANSIStrings. This is equaivalent to `unstyle(strs).len()`.
 pub fn unstyled_len(strs: &ANSIStrings) -> usize {
     let mut l = 0;
-    for i in strs.0.iter() {
+    for i in strs.strings.iter() {
         l += i.deref().len();
     }
     l

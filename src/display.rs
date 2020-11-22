@@ -5,7 +5,7 @@ use std::ops::Deref;
 
 use ansi::RESET;
 use difference::Difference;
-use style::{Style, Colour};
+use style::{Style, Colour, Shell};
 use write::AnyWrite;
 
 
@@ -131,8 +131,19 @@ where <S as ToOwned>::Owned: fmt::Debug {
 /// written with a minimum of control characters.
 #[derive(Debug, PartialEq)]
 pub struct ANSIGenericStrings<'a, S: 'a + ToOwned + ?Sized>
-    (pub &'a [ANSIGenericString<'a, S>])
-    where <S as ToOwned>::Owned: fmt::Debug, S: PartialEq;
+    where <S as ToOwned>::Owned: fmt::Debug, S: PartialEq {
+    /// Styled strings
+    pub strings: &'a [ANSIGenericString<'a, S>],
+    shell: Shell,
+}
+
+impl<'a, S: 'a + ToOwned + ?Sized> ANSIGenericStrings<'a, S>
+    where <S as ToOwned>::Owned: fmt::Debug, S: PartialEq {
+    /// Returns an `ANSIGenericStrings` with the shell property set.
+    pub fn shell(&self, shell: Shell) -> Self {
+        Self { shell, .. *self }
+    }
+}
 
 /// A set of `ANSIString`s collected together, in order to be written with a
 /// minimum of control characters.
@@ -140,8 +151,8 @@ pub type ANSIStrings<'a> = ANSIGenericStrings<'a, str>;
 
 /// A function to construct an `ANSIStrings` instance.
 #[allow(non_snake_case)]
-pub fn ANSIStrings<'a>(arg: &'a [ANSIString<'a>]) -> ANSIStrings<'a> {
-    ANSIGenericStrings(arg)
+pub fn ANSIStrings<'a>(strings: &'a [ANSIString<'a>]) -> ANSIStrings<'a> {
+    ANSIGenericStrings { strings, shell: Shell::None }
 }
 
 /// A set of `ANSIByteString`s collected together, in order to be
@@ -150,8 +161,8 @@ pub type ANSIByteStrings<'a> = ANSIGenericStrings<'a, [u8]>;
 
 /// A function to construct an `ANSIByteStrings` instance.
 #[allow(non_snake_case)]
-pub fn ANSIByteStrings<'a>(arg: &'a [ANSIByteString<'a>]) -> ANSIByteStrings<'a> {
-    ANSIGenericStrings(arg)
+pub fn ANSIByteStrings<'a>(strings: &'a [ANSIByteString<'a>]) -> ANSIByteStrings<'a> {
+    ANSIGenericStrings { strings, shell: Shell::None }
 }
 
 
@@ -246,18 +257,24 @@ where <S as ToOwned>::Owned: fmt::Debug, &'a S: AsRef<[u8]> {
     fn write_to_any<W: AnyWrite<wstr=S> + ?Sized>(&self, w: &mut W) -> Result<(), W::Error> {
         use self::Difference::*;
 
-        let first = match self.0.first() {
+        let first = match self.strings.first() {
             None => return Ok(()),
             Some(f) => f,
         };
 
-        write!(w, "{}", first.style.prefix())?;
+        let (esc_prefix, esc_suffix) = match self.shell {
+            Shell::Bash => ("\\[", "\\]"),
+            Shell::Zsh => ("%{", "%}"),
+            _ => ("", ""),
+        };
+
+        write!(w, "{}{}{}", esc_prefix, first.style.prefix(), esc_suffix)?;
         w.write_str(first.string.as_ref())?;
 
-        for window in self.0.windows(2) {
+        for window in self.strings.windows(2) {
             match Difference::between(&window[0].style, &window[1].style) {
-                ExtraStyles(style) => write!(w, "{}", style.prefix())?,
-                Reset              => write!(w, "{}{}", RESET, window[1].style.prefix())?,
+                ExtraStyles(style) => write!(w, "{}{}{}", esc_prefix, style.prefix(), esc_suffix)?,
+                Reset              => write!(w, "{}{}{}{}{}{}", esc_prefix, RESET, esc_suffix, esc_prefix, window[1].style.prefix(), esc_suffix)?,
                 NoDifference       => {/* Do nothing! */},
             }
 
@@ -267,7 +284,7 @@ where <S as ToOwned>::Owned: fmt::Debug, &'a S: AsRef<[u8]> {
         // Write the final reset string after all of the ANSIStrings have been
         // written, *except* if the last one has no styles, because it would
         // have already been written by this point.
-        if let Some(last) = self.0.last() {
+        if let Some(last) = self.strings.last() {
             if !last.style.is_plain() {
                 write!(w, "{}", RESET)?;
             }
